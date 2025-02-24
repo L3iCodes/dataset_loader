@@ -1,27 +1,34 @@
 import datasets
-import os
+import requests
 
 class ImageDataset(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description="A raw image dataset",
             features=datasets.Features({
-                "image": datasets.Image()  # Only images, no labels
+                "image": datasets.Image()  # Images only, no labels
             }),
         )
 
     def _split_generators(self, dl_manager):
-        # Load image URLs directly from GitHub
-        repo_url = "https://github.com/L3iCodes/dataset_loader/tree/main/images"
-        image_files = [f"{repo_url}{img}" for img in ["image1.jpg", "image2.jpg", "image3.jpg"]]  # Modify dynamically
+        repo_api_url = "https://api.github.com/repos/L3iCodes/dataset_loader/contents/images"
+        response = requests.get(repo_api_url)
+
+        if response.status_code == 200:
+            image_urls = [file["download_url"] for file in response.json() if file["name"].endswith((".jpg", ".png"))]
+        else:
+            raise Exception("Error fetching image list from GitHub")
+
+        # Download images locally
+        downloaded_images = dl_manager.download(image_urls)
 
         return [
             datasets.SplitGenerator(
-                name=datasets.Split.TRAIN,  # No actual split, just a single dataset
-                gen_kwargs={"image_files": image_files},
+                name=datasets.Split.TRAIN,
+                gen_kwargs={"image_files": downloaded_images},  # Pass downloaded image paths
             ),
         ]
 
     def _generate_examples(self, image_files):
         for i, img_path in enumerate(image_files):
-            yield i, {"image": img_path}
+            yield i, {"image": img_path}  # Now, img_path is a local file path
